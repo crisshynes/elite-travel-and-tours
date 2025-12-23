@@ -13,7 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module" src="/public/js/supabase.js"></script>
   <script type="module">
-    import { mountShell } from '/public/js/ui.js';
+    import { mountShell } from '/src/js/ui.js';
     mountShell({ withSidebar: true, requireAdmin: true });
   </script>
   <style>
@@ -172,7 +172,7 @@
   </div>
 
   <script type="module">
-    import { sb } from '/public/js/supabase.js';
+    import { sb } from '/src/js/supabase.js';
 
     // KPI loading
     async function loadKPIs(){
