@@ -151,15 +151,15 @@
  <div id="notifFeed" class="feed hidden">
   <div class="feed-toolbar">
     <span class="muted small-text">Notifications</span>
-    <div style="display:flex;gap:.25rem;">
-      <button id="markAllReadBtn"><i class="fa fa-check-double"></i> Read</button>
-      <button id="clearAllNotifBtn"><i class="fa fa-trash"></i> Clear</button>
+    <div style="color:var(--brand);display:flex;gap:.25rem;">
+      <button id="markAllReadBtn" class='btn ' style="color:var(--brand);" ><i class="fa fa-check-double"></i> Mark as Read</button>
+      <button id="clearAllNotifBtn" class='btn '><i class="fa fa-trash"></i> Clear</button>
     </div>
   </div>
   <div id="notifList" class="list"></div>
 </div>
 <script type="module" src="/src/js/notifications.js"></script>
-
+  
   <main class="container grid">
     <section class="card"><div class="body list">
       <h2 class="page-title">Book Appointment</h2>

@@ -21,7 +21,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
     body{margin-top: 100px;}
-    .notif-item .title{ font-weight:600; }
+    /* .notif-item .title{ font-weight:600; }
     .notif-item .body{ color:#4b5563; font-size:.82rem; }
     .notif-item{
       border-bottom:1px solid #e5e7eb; padding:.3rem 0;
@@ -57,7 +57,7 @@
       font-size:.9rem;
     }
     .toast.show{ display:flex; align-items:center; gap:.6rem; }
-    .toast i{ color:#38bdf8; }
+    .toast i{ color:#38bdf8; } */
 
     .page-wrap{
       max-width:1100px;
@@ -153,10 +153,10 @@
     }
     .tab-panel{ display:none; padding-top:.75rem; }
     .tab-panel.active{ display:block; }
-
+/* 
     .section-title{ font-size:1.05rem; margin:0 0 .3rem; }
     .muted{ color:var(--muted); }
-    .small-text{ font-size:.8rem; }
+    .small-text{ font-size:.8rem; } */
 
     .about-grid{ display:grid; gap:.6rem; grid-template-columns:1.1fr 1.2fr; }
     @media(max-width:780px){ .about-grid{ grid-template-columns:1fr; } }
@@ -311,15 +311,17 @@
 
   <!-- Notification feed -->
   <div id="notifFeed" class="feed hidden">
-    <div class="feed-toolbar">
-      <span class="muted small-text">Notifications</span>
-      <div style="display:flex;gap:.25rem;">
-        <button id="markAllReadBtn" title="Mark all as read"><i class="fa fa-check-double"></i> Read</button>
-        <button id="clearAllNotifBtn" title="Clear all"><i class="fa fa-trash"></i> Clear</button>
-      </div>
+  <div class="feed-toolbar">
+    <span class="muted small-text">Notifications</span>
+    <div style="color:var(--brand);display:flex;gap:.25rem;">
+      <button id="markAllReadBtn" class='btn ' style="color:var(--brand);" ><i class="fa fa-check-double"></i> Mark as Read</button>
+      <button id="clearAllNotifBtn" class='btn '><i class="fa fa-trash"></i> Clear</button>
     </div>
-    <div id="notifList" class="list"></div>
   </div>
+  <div id="notifList" class="list"></div>
+</div>
+<script type="module" src="/src/js/notifications.js"></script>
+  
 
   <!-- Toast -->
   <div id="toast" class="toast" role="status" aria-live="polite">
@@ -1350,7 +1352,7 @@
     function formatAmount(amount,currency){
       const curr = (currency || 'GHS').toUpperCase();
       const val = Number(amount) || 0;
-      return new Intl.NumberFormat(undefined,{ style:'currency', currency: curr }).format(val/100);
+      return new Intl.NumberFormat(undefined,{ style:'currency', currency: curr }).format(val);
     }
 
     function renderPayments(list) {

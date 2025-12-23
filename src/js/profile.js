@@ -1,4 +1,4 @@
-import { sb } from '/public/js/supabase.js';
+import { sb } from './supabase.js';
 
 export async function mountProfile() {
   const root = document.getElementById('profileRoot');

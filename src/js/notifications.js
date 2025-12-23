@@ -14,7 +14,7 @@
      - Mark/Clear are strictly viewer-scoped
    ============================================================ */
 
-import { sb } from "/src/js/supabase.js";
+import { sb } from "./supabase.js";
 
 /* ------------------------------------------------------------
    DOM REFERENCES
