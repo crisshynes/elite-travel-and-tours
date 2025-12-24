@@ -1,23 +1,23 @@
 /* ============================================================
-   GLOBAL NOTIFICATION SYSTEM — Elite Travel & Tour (Admin-wide intake)
-   Single-file, production-ready
-   Requires:
-     - Supabase client exported as "sb" from /public/js/supabase.js
-     - HTML elements:
+   GLOBAL NOTIFICATION SYSTEM — Elite Travel & Tour
+   Production-ready, role-aware (admin vs user), performant
+   Requirements:
+     - Supabase client exported as "sb" from /src/js/supabase.js
+     - DOM elements:
          #bellBtn, #bellCount, #notifFeed, #notifList,
          #markAllReadBtn, #clearAllNotifBtn
    Goals:
-     - Admin (role === 'admin') receives notifications for ALL users’ new requests
-       (applications, appointments, payments) in realtime, persisted per-admin
-     - Users receive only their own notifications
-     - Newest at top, unread highlighted, role-aware links
-     - Mark/Clear are strictly viewer-scoped
+     - Admins receive notifications for ALL users’ new requests in realtime,
+       persisted per-admin and shown in admin’s drawer.
+     - Users receive only their own notifications (viewer-scoped).
+     - Newest at top, unread highlighted, role-aware action links.
+     - Mark/Clear operations are viewer-scoped (affect only this viewer’s feed).
    ============================================================ */
 
-import { sb } from "./supabase.js";
+import { sb } from "/src/js/supabase.js";
 
 /* ------------------------------------------------------------
-   DOM REFERENCES
+   DOM refs
 ------------------------------------------------------------- */
 const bellBtn = document.getElementById("bellBtn");
 const bellCount = document.getElementById("bellCount");
@@ -27,20 +27,21 @@ const markAllReadBtn = document.getElementById("markAllReadBtn");
 const clearAllNotifBtn = document.getElementById("clearAllNotifBtn");
 
 /* ------------------------------------------------------------
-   STATE
+   State
 ------------------------------------------------------------- */
-let notifHistory = [];          // viewer-scoped notifications (admin/user)
-let rtViewerChannel = null;     // notifications rows subscription for viewer
-let rtAdminIntakeChannels = []; // core tables intake (admin only)
+let notifHistory = [];          // viewer-scoped notifications (admin or user)
+let rtViewerChannel = null;     // subscription for notifications rows for viewer
+let rtAdminIntakeChannels = []; // subscriptions for admin intake on core tables
 let currentUserId = null;
 let currentUserEmail = null;
-let currentUserRole = "user";
+let currentUserRole = "user";   // "user" or "admin"
+let isDrawerOpen = false;
 
 /* ------------------------------------------------------------
-   UTIL
+   Utils
 ------------------------------------------------------------- */
-function safeMeta(m) { return m && typeof m === "object" ? m : {}; }
-function isUnread(n) { return !safeMeta(n.metadata).seen; }
+function safeMeta(m){ return m && typeof m === "object" ? m : {}; }
+function isUnread(n){ return !safeMeta(n.metadata).seen; }
 function withSeenTrue(metadata){ const b=safeMeta(metadata); return { ...b, seen: true }; }
 function nowIso(){ return new Date().toISOString(); }
 function sortNewestFirst(list){
@@ -50,6 +51,7 @@ function sortNewestFirst(list){
     return tb - ta;
   });
 }
+function clamp(n,min,max){ return Math.max(min, Math.min(max, n)); }
 function showToast(message, ms=2500){
   const t=document.getElementById("toast"), tt=document.getElementById("toastText");
   if(!t||!tt) return; tt.textContent=message; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), ms);
@@ -62,7 +64,7 @@ function updateBellCounter(){
 }
 
 /* ------------------------------------------------------------
-   LINKS
+   Role-aware links
 ------------------------------------------------------------- */
 function adminLinkForNotification(n){
   const meta=safeMeta(n.metadata);
@@ -85,20 +87,23 @@ function userLinkForNotification(n){
   const meta=safeMeta(n.metadata);
   const type=(meta.type||meta.category||"").toLowerCase();
   if(type==="application"||meta.application_id){
-    const statusText=(meta.status||n.message||n.text||"").toLowerCase();
     const tracking=meta.tracking_id||meta.latest_tracking_id||null;
-    const accepted = statusText.includes("accepted") || statusText.includes("approved");
-    if(accepted && tracking) return `/views/pages/tracking.html?tracking=${encodeURIComponent(tracking)}`;
-    return null;
+    return tracking ? `/views/pages/tracking.html?tracking=${encodeURIComponent(tracking)}` : null;
   }
-  if(type==="tracking"||meta.tracking_id){ const tr=meta.tracking_id; return tr ? `/views/pages/tracking.html?tracking=${encodeURIComponent(tr)}` : null; }
-  if(type==="payment"||meta.payment_id){ const tr=meta.tracking_id; return tr ? `/views/pages/tracking.html?tracking=${encodeURIComponent(tr)}` : null; }
-  if(type==="appointment"||meta.appointment_id){ const id=meta.appointment_id; return id ? `/views/pages/appointment.html?id=${encodeURIComponent(id)}` : null; }
+  if(type==="tracking"||meta.tracking_id){
+    const tr=meta.tracking_id; return tr ? `/views/pages/tracking.html?tracking=${encodeURIComponent(tr)}` : null;
+  }
+  if(type==="payment"||meta.payment_id){
+    const tr=meta.tracking_id; return tr ? `/views/pages/tracking.html?tracking=${encodeURIComponent(tr)}` : null;
+  }
+  if(type==="appointment"||meta.appointment_id){
+    const id=meta.appointment_id; return id ? `/views/pages/appointment.html?id=${encodeURIComponent(id)}` : null;
+  }
   return null;
 }
 
 /* ------------------------------------------------------------
-   RENDER
+   Render
 ------------------------------------------------------------- */
 function renderNotificationItem(n){
   const role=currentUserRole;
@@ -113,7 +118,7 @@ function renderNotificationItem(n){
   el.style.display="grid";
   el.style.gap="6px";
   el.style.transition="background .15s ease";
-  if(unread) el.style.background="#e0f2fe"; // light blue
+  if(unread) el.style.background="var(--brand)"; // light blue
 
   const title=n.title||meta.title||"Notification";
   const actorEmail=meta.user_email || n.user_email || meta.email || "";
@@ -124,7 +129,7 @@ function renderNotificationItem(n){
   titleEl.textContent=headerText;
 
   const bodyEl=document.createElement("div");
-  bodyEl.className="body"; bodyEl.style.color="#64748b"; bodyEl.style.fontSize=".88rem";
+  bodyEl.className="body"; bodyEl.style.color="var(--gray-200)"; bodyEl.style.fontSize=".88rem";
   bodyEl.textContent=n.message || n.text || meta.message || "";
 
   const metaRow=document.createElement("div");
@@ -180,7 +185,7 @@ function renderNotificationFeed(){
 }
 
 /* ------------------------------------------------------------
-   LOAD (viewer-scoped)
+   Fetch viewer-scoped notifications
 ------------------------------------------------------------- */
 async function loadInitialNotifications(userId){
   try{
@@ -197,24 +202,25 @@ async function loadInitialNotifications(userId){
 }
 
 /* ------------------------------------------------------------
-   SUBSCRIBE: viewer notifications
+   Subscribe to viewer notifications
 ------------------------------------------------------------- */
 async function subscribeViewerNotifications(userId){
-  if(rtViewerChannel){ await sb.removeChannel(rtViewerChannel); rtViewerChannel=null; }
+  if(rtViewerChannel){ try{ await sb.removeChannel(rtViewerChannel); }catch(_){ } rtViewerChannel=null; }
   rtViewerChannel = sb
     .channel(`notifs-${userId}`)
     .on("postgres_changes",
       { event:"INSERT", schema:"public", table:"notifications", filter:`user_id=eq.${userId}` },
       (payload)=>{
         const n={ ...payload.new, metadata: safeMeta(payload.new.metadata), client_inserted_at: nowIso() };
-        notifHistory.unshift(n); renderNotificationFeed(); showToast(n.title||"New notification");
+        notifHistory.unshift(n); renderNotificationFeed(); if(!isDrawerOpen) showToast(n.title||"New notification");
       })
     .on("postgres_changes",
       { event:"UPDATE", schema:"public", table:"notifications", filter:`user_id=eq.${userId}` },
       (payload)=>{
         const u={ ...payload.new, metadata: safeMeta(payload.new.metadata) };
         const idx=notifHistory.findIndex(x=>x.id===u.id);
-        if(idx>-1) notifHistory[idx]=u; renderNotificationFeed();
+        if(idx>-1){ notifHistory[idx]=u; } else { notifHistory.unshift(u); }
+        renderNotificationFeed();
       })
     .on("postgres_changes",
       { event:"DELETE", schema:"public", table:"notifications", filter:`user_id=eq.${userId}` },
@@ -225,7 +231,8 @@ async function subscribeViewerNotifications(userId){
 }
 
 /* ------------------------------------------------------------
-   ADMIN INTAKE: subscribe to ALL inserts and persist admin-scoped notifications
+   Admin intake (persist per-admin)
+   Admin receives inserts from ALL users for core tables
 ------------------------------------------------------------- */
 function extractActorEmail(row){
   const m=safeMeta(row.metadata);
@@ -236,8 +243,8 @@ function buildAdminNotifPayload(type, row, adminUserId, adminEmail){
   const actorEmail=extractActorEmail(row);
   const meta={ scope:"admin", type, user_email:actorEmail, action_required:true };
   // identifiers
-  if(type==="appointment") meta.appointment_id=row.id;
-  if(type==="application") meta.application_id=row.id;
+  if(type==="appointment"){ meta.appointment_id=row.id; }
+  if(type==="application"){ meta.application_id=row.id; }
   if(type==="payment"){
     meta.payment_id=row.id;
     const pm=safeMeta(row.metadata);
@@ -251,7 +258,7 @@ function buildAdminNotifPayload(type, row, adminUserId, adminEmail){
     ? `User (${actorEmail}) initiated a ${type}. Review and take action.`
     : `A ${type} was created. Review and take action.`;
   return {
-    user_id: adminUserId,          // persisted to THIS admin
+    user_id: adminUserId,          // persisted to THIS admin only
     user_email: adminEmail || null,
     title, message,
     category: "admin",
@@ -271,37 +278,35 @@ async function insertAdminNotif(type, row){
       .single();
     if(error) throw error;
     const n={ ...data, metadata: safeMeta(data.metadata), client_inserted_at: nowIso() };
-    notifHistory.unshift(n); renderNotificationFeed(); showToast(n.title||"New notification");
+    notifHistory.unshift(n); renderNotificationFeed(); if(!isDrawerOpen) showToast(n.title||"New notification");
   }catch(e){ console.warn("Admin intake insert failed:", e); }
 }
 async function subscribeAdminIntake(){
-  // Clean up
-  for(const ch of rtAdminIntakeChannels){ try{ await sb.removeChannel(ch); }catch(_){} }
+  // Clean up existing admin channels
+  for(const ch of rtAdminIntakeChannels){ try{ await sb.removeChannel(ch); }catch(_){ } }
   rtAdminIntakeChannels=[];
 
+  // Subscribe to INSERTs on core tables
   const chApplications = sb
     .channel("admin-intake-applications")
-    .on("postgres_changes", { event:"INSERT", schema:"public", table:"applications" },
-      (payload)=> insertAdminNotif("application", payload.new))
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"applications" }, (payload)=> insertAdminNotif("application", payload.new))
     .subscribe();
 
   const chAppointments = sb
     .channel("admin-intake-appointments")
-    .on("postgres_changes", { event:"INSERT", schema:"public", table:"appointments" },
-      (payload)=> insertAdminNotif("appointment", payload.new))
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"appointments" }, (payload)=> insertAdminNotif("appointment", payload.new))
     .subscribe();
 
   const chPayments = sb
     .channel("admin-intake-payments")
-    .on("postgres_changes", { event:"INSERT", schema:"public", table:"payments" },
-      (payload)=> insertAdminNotif("payment", payload.new))
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"payments" }, (payload)=> insertAdminNotif("payment", payload.new))
     .subscribe();
 
   rtAdminIntakeChannels.push(chApplications, chAppointments, chPayments);
 }
 
 /* ------------------------------------------------------------
-   ACTIONS: mark all read / clear all (viewer-only)
+   Actions: mark all read / clear all (viewer-only)
 ------------------------------------------------------------- */
 async function markAllNotificationsRead(){
   if(!currentUserId) return;
@@ -330,34 +335,60 @@ async function clearAllNotifications(){
 }
 
 /* ------------------------------------------------------------
-   BUTTONS
+   Drawer toggle and interactions
 ------------------------------------------------------------- */
+function openDrawer(){
+  if(!notifFeed) return;
+  notifFeed.classList.add("open"); isDrawerOpen=true;
+}
+function closeDrawer(){
+  if(!notifFeed) return;
+  notifFeed.classList.remove("open"); isDrawerOpen=false;
+}
+bellBtn?.addEventListener("click", ()=>{
+  if(isDrawerOpen) closeDrawer(); else openDrawer();
+});
 markAllReadBtn?.addEventListener("click", markAllNotificationsRead);
-clearAllNotifBtn?.addEventListener("click", clearAllNotifications);
-bellBtn?.addEventListener("click", ()=> notifFeed?.classList.toggle("open"));
+clearAllNotifBtn?.addEventListener("click", async ()=>{
+  if(!confirm("Clear all notifications for this account?")) return;
+  await clearAllNotifications();
+});
+
+/* Click-outside to close */
+document.addEventListener("click",(e)=>{
+  if(!notifFeed) return;
+  const inFeed=e.target.closest("#notifFeed");
+  const isBell=e.target.closest("#bellBtn");
+  if(isBell) return; // handled by bellBtn
+  if(!inFeed) closeDrawer();
+});
 
 /* ------------------------------------------------------------
-   INIT
+   Initialization
 ------------------------------------------------------------- */
 (async function initNotifications(){
-  const { data } = await sb.auth.getSession();
-  const user = data?.session?.user;
-  if(!user) return;
-
-  currentUserId = user.id;
-  currentUserEmail = user.email || null;
-
   try{
-    const { data: userRow } = await sb.from("users").select("role,email").eq("id", currentUserId).single();
-    currentUserRole = userRow?.role || "user";
-  }catch(_){ currentUserRole = "user"; }
+    const { data } = await sb.auth.getSession();
+    const user = data?.session?.user;
+    if(!user) return;
 
-  // Viewer-scoped feed
-  await loadInitialNotifications(currentUserId);
-  await subscribeViewerNotifications(currentUserId);
+    currentUserId = user.id;
+    currentUserEmail = user.email || null;
 
-  // Admin-wide intake: listen to ALL users’ inserts and persist admin notifications
-  if(currentUserRole === "admin"){
-    await subscribeAdminIntake();
+    try{
+      const { data: userRow } = await sb.from("users").select("role,email").eq("id", currentUserId).single();
+      currentUserRole = userRow?.role || "user";
+    }catch(_){ currentUserRole = "user"; }
+
+    // Load viewer-scoped notifications
+    await loadInitialNotifications(currentUserId);
+    await subscribeViewerNotifications(currentUserId);
+
+    // Admin intake: listen to ALL inserts and persist admin notifications
+    if(currentUserRole === "admin"){
+      await subscribeAdminIntake();
+    }
+  }catch(e){
+    console.error("Notifications init failed:", e);
   }
 })();
