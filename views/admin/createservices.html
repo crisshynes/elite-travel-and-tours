@@ -310,6 +310,16 @@
       color:#cbd5f5;
     }
 
+    .preview-list{
+      margin-top:.55rem;
+      padding-left:1rem;
+      font-size:.86rem;
+      color:#cbd5f5;
+    }
+    .preview-list li{
+      margin:.18rem 0;
+    }
+
     .toast{
       position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
       background:#020617; color:#e5e7eb; padding:.75rem 1rem; border-radius:999px;
@@ -484,7 +494,7 @@
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Base price amount</label>
-                      <input id="svcPriceAmount" class="input" type="number" placeholder="500">
+                      <input id="svcPriceAmount" class="input" type="number" placeholder="500" min="0">
                     </div>
                   </div>
                 </section>
@@ -511,11 +521,11 @@
                   <div class="grid-2" style="margin-top:.6rem;">
                     <div>
                       <label class="muted" style="font-size:.85rem;">Banner URL (optional)</label>
-                      <input id="svcBannerUrl" class="input" placeholder="/assets/banners/workpay.jpg">
+                      <input id="svcBannerUrl" class="input" placeholder="/assets/services/workpay.jpg">
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Icon URL (optional)</label>
-                      <input id="svcIconUrl" class="input" placeholder="/assets/icons/visa.svg">
+                      <input id="svcIconUrl" class="input" placeholder="/assets/services/logo.png">
                     </div>
                   </div>
                 </section>
@@ -539,16 +549,19 @@
                   <div class="grid-2">
                     <div>
                       <label class="muted" style="font-size:.85rem;">Key requirements</label>
-                      <textarea id="svcRequirements" class="textarea" placeholder="- Valid passport&#10;- Proof of funds&#10;- Police report"></textarea>
+                      <textarea id="svcRequirements" class="textarea" placeholder="- Valid passport&#10- Proof of funds&#10- Police report"></textarea>
+                      <p class="file-subtext">Tip: each line becomes a bullet. In the database, we store these joined with “.,”.</p>
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">What is included</label>
-                      <textarea id="svcIncludes" class="textarea" placeholder="- Application support&#10;- Document review&#10;- Appointment booking"></textarea>
+                      <textarea id="svcIncludes" class="textarea" placeholder="- Application support&#10- Document review&#10- Appointment booking"></textarea>
+                      <p class="file-subtext">Tip: each line becomes a bullet. Stored with “.,” in metadata.</p>
                     </div>
                   </div>
                   <div style="margin-top:.6rem;">
                     <label class="muted" style="font-size:.85rem;">Additional notes</label>
-                    <textarea id="svcNotes" class="textarea" placeholder="Internal hints or extra details."></textarea>
+                    <textarea id="svcNotes" class="textarea" placeholder="Internal hints or extra details (line-separated)."></textarea>
+                    <p class="file-subtext">Each line is a bullet in preview. Stored with “.,” in metadata.</p>
                   </div>
                 </section>
 
@@ -562,7 +575,7 @@
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Priority</label>
-                      <input id="svcPriority" type="number" class="input" value="0">
+                      <input id="svcPriority" type="number" class="input" value="0" min="0">
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Featured</label>
@@ -631,6 +644,21 @@
                 <div class="preview-body" id="svcPrevShort">
                   Short description will appear here as users see it on the services page.
                 </div>
+
+                <div class="preview-body">
+                  <h4 class="section-title" style="font-size:.95rem;margin:.6rem 0 .3rem;">Requirements</h4>
+                  <ul class="preview-list" id="svcPrevRequirements"></ul>
+                </div>
+
+                <div class="preview-body">
+                  <h4 class="section-title" style="font-size:.95rem;margin:.6rem 0 .3rem;">Includes</h4>
+                  <ul class="preview-list" id="svcPrevIncludes"></ul>
+                </div>
+
+                <div class="preview-body">
+                  <h4 class="section-title" style="font-size:.95rem;margin:.6rem 0 .3rem;">Notes</h4>
+                  <ul class="preview-list" id="svcPrevNotes"></ul>
+                </div>
               </section>
             </div>
           </div>
@@ -672,15 +700,21 @@
     const adminEmailSpan=document.getElementById('adminEmail');
     const adminLogout=document.getElementById('adminLogout');
 
-    const { data } = await sb.auth.getSession();
-    const session=data.session;
-    const admin=session?.user;
+    try{
+      const { data } = await sb.auth.getSession();
+      const session=data.session;
+      const admin=session?.user;
 
-    if(!admin){
-      showToast('Admin session required.');
+      if(!admin){
+        showToast('Admin session required.');
+        window.location.href='/views/pages/login.html';
+      }else{
+        adminEmailSpan.textContent=admin.email;
+      }
+    }catch(e){
+      console.error('Session error:', e);
+      showToast('Session check failed.');
       window.location.href='/views/pages/login.html';
-    }else{
-      adminEmailSpan.textContent=admin.email;
     }
 
     adminLogout?.addEventListener('click',async()=>{
@@ -732,6 +766,9 @@
     const svcPrevTagPrice=document.getElementById('svcPrevTagPrice');
     const svcPrevTagPriority=document.getElementById('svcPrevTagPriority');
     const svcPrevShort=document.getElementById('svcPrevShort');
+    const svcPrevRequirements=document.getElementById('svcPrevRequirements');
+    const svcPrevIncludes=document.getElementById('svcPrevIncludes');
+    const svcPrevNotes=document.getElementById('svcPrevNotes');
 
     const crumbMode=document.getElementById('crumbMode');
     const pageTitle=document.getElementById('pageTitle');
@@ -782,20 +819,54 @@
       }
     }
 
+    /* List parsing helpers — UI <-> DB (“.,” separator) */
+    const SEP='.,';
+
+    function linesToArray(textareaValue){
+      return (textareaValue || '')
+        .split(/\r?\n/)
+        .map(s=>s.trim())
+        .filter(Boolean);
+    }
+
+    function arrayToDbString(arr){
+      return (arr || []).map(s => s.replace(/\s+/g,' ').trim()).join(SEP);
+    }
+
+    function dbStringToLines(dbString){
+      if(!dbString) return '';
+      const arr = String(dbString)
+        .split(SEP)
+        .map(s=>s.trim())
+        .filter(Boolean);
+      return arr.join('\n');
+    }
+
+    function setPreviewList(ul, arr){
+      ul.innerHTML = '';
+      (arr || []).forEach(item=>{
+        const li=document.createElement('li');
+        li.textContent=item;
+        ul.appendChild(li);
+      });
+    }
+
+    function computePriceLabel(){
+      const priceLabelRaw=svcPriceLabel.value.trim();
+      const priceAmountRaw=svcPriceAmount.value.trim();
+      const hasAmount = priceAmountRaw !== '' && !Number.isNaN(Number(priceAmountRaw));
+      if(priceLabelRaw) return priceLabelRaw;
+      if(hasAmount) return `From ${priceAmountRaw}`;
+      return 'Price';
+    }
+
     function updatePreview(){
       const title=svcTitle.value.trim() || 'Service title';
       const category=svcCategory.value || '—';
       const plan=svcPlan.value || '';
       const status=svcStatus.value || 'draft';
 
-      const priceLabelRaw=svcPriceLabel.value.trim();
-      const priceAmountRaw=svcPriceAmount.value.trim();
-      let priceLabel='Price';
-      if(priceLabelRaw){
-        priceLabel=priceLabelRaw;
-      }else if(priceAmountRaw){
-        priceLabel=`From ${priceAmountRaw}`;
-      }
+      const priceLabel=computePriceLabel();
 
       const priorityRaw=svcPriority.value.trim();
       const priority = priorityRaw && !Number.isNaN(parseInt(priorityRaw,10)) ? parseInt(priorityRaw,10) : 0;
@@ -820,6 +891,15 @@
 
       svcPrevShort.textContent = svcShortDesc.value.trim()
         || 'Short description will appear here as users see it on the services page.';
+
+      /* Lists preview (from current textareas) */
+      const reqArr = linesToArray(svcRequirements.value);
+      const incArr = linesToArray(svcIncludes.value);
+      const noteArr = linesToArray(svcNotes.value);
+
+      setPreviewList(svcPrevRequirements, reqArr);
+      setPreviewList(svcPrevIncludes, incArr);
+      setPreviewList(svcPrevNotes, noteArr);
 
       if(currentIconUrl){
         svcPrevLogoText.innerHTML=`<img src="${currentIconUrl}" alt="icon">`;
@@ -913,20 +993,35 @@
 
         const m=row.metadata || {};
 
-        svcPriceLabel.value=m.price_label || '';
-        svcPriceAmount.value=m.price_amount != null ? String(m.price_amount) : '';
+        /* Price round-trip */
+        svcPriceLabel.value = m.price_label || '';
+        svcPriceAmount.value = m.price_amount != null ? String(m.price_amount) : '';
 
+        /* Media round-trip */
         currentBannerUrl = m.banner || null;
         currentIconUrl = m.icon || null;
         svcBannerUrl.value = m.banner || '';
         svcIconUrl.value = m.icon || '';
 
-        svcFullDesc.value=m.full_desc || '';
-        svcRequirements.value=m.requirements || '';
-        svcIncludes.value=m.includes || '';
-        svcNotes.value=m.notes || '';
+        /* Long description */
+        svcFullDesc.value = m.full_desc || '';
 
-        svcTags.value=(m.tags || []).join(', ');
+        /* Lists round-trip — DB “.,” -> UI lines */
+        svcRequirements.value = dbStringToLines(m.requirements || '');
+        svcIncludes.value = dbStringToLines(m.includes || '');
+        svcNotes.value = dbStringToLines(m.notes || '');
+
+        /* Tags round-trip */
+        if(Array.isArray(m.tags)){
+          svcTags.value = m.tags.join(', ');
+        }else if(typeof m.tags === 'string'){
+          // supports string tags separated by “.,”
+          const tagArr = m.tags.split(SEP).map(t=>t.trim()).filter(Boolean);
+          svcTags.value = tagArr.join(', ');
+        }else{
+          svcTags.value='';
+        }
+
         svcPriority.value=String(m.priority ?? 0);
         svcFeatured.value=m.featured ? 'true' : 'false';
         svcAdminNote.value=m.admin_note || '';
@@ -1003,25 +1098,38 @@
     function buildServiceMetadataBase(){
       const price_label=svcPriceLabel.value.trim() || null;
       const price_amount_raw=svcPriceAmount.value.trim();
-      const price_amount=price_amount_raw ? Number(price_amount_raw) : null;
+      const price_amount=(price_amount_raw !== '' && !Number.isNaN(Number(price_amount_raw)))
+        ? Number(price_amount_raw)
+        : null;
 
-      const requirements=svcRequirements.value.trim() || null;
-      const includes=svcIncludes.value.trim() || null;
-      const notes=svcNotes.value.trim() || null;
       const full_desc=svcFullDesc.value.trim() || null;
 
-      const tagsRaw=svcTags.value.trim();
-      const tags=tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
+      /* Lists UI -> DB string (“.,” separator) */
+      const requirementsArr = linesToArray(svcRequirements.value);
+      const includesArr = linesToArray(svcIncludes.value);
+      const notesArr = linesToArray(svcNotes.value);
 
+      const requirements = arrayToDbString(requirementsArr) || null;
+      const includes = arrayToDbString(includesArr) || null;
+      const notes = arrayToDbString(notesArr) || null;
+
+      /* Tags UI -> array */
+      const tagsRaw=svcTags.value.trim();
+      const tags=tagsRaw
+        ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean)
+        : [];
+
+      /* Priority / featured / admin note */
       const priorityRaw=svcPriority.value.trim();
       let priority=0;
       if(priorityRaw){
         const p=parseInt(priorityRaw,10);
-        if(!Number.isNaN(p)) priority=p;
+        if(!Number.isNaN(p) && p >= 0) priority=p;
       }
       const featured=svcFeatured.value==='true';
       const admin_note=svcAdminNote.value.trim() || null;
 
+      /* Extra JSON */
       let extra_json=null;
       const metaRaw=svcMetadataJson.value.trim();
       if(metaRaw){
@@ -1057,6 +1165,12 @@
       let metadata=buildServiceMetadataBase();
       metadata=await prepareServiceImagesInMetadata(metadata);
 
+      /* Normalize price label if empty and amount exists */
+      if(!metadata.price_label && metadata.price_amount != null){
+        metadata.price_label = `From ${metadata.price_amount}`;
+      }
+
+      /* Slug */
       const baseSlug=slugify(title);
       const slug=await generateUniqueServiceSlug(baseSlug);
 
