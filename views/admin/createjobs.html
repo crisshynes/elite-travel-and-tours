@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Admin — Job builder | Elite Travel & Tour</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="description" content="Create and edit rich, image-ready jobs for Work & Pay, Express, and other programs with full metadata and preview."/>
+  <meta name="description" content="Create and edit rich, image-ready jobs for Work & Pay, Express, and other programs with full metadata, list parsing, and preview."/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="module" src="/src/js/supabase.js"></script>
@@ -163,11 +163,8 @@
       flex-direction:column;
       min-height:0;
     }
-    /* On large screens, card fills viewport minus header for split layout */
     @media(min-width:901px){
-      .card{
-        height:calc(100vh - 72px - 2rem);
-      }
+      .card{ height:calc(100vh - 72px - 2rem); }
     }
 
     .section-title{ font-size:1.15rem; margin-bottom:.4rem; }
@@ -204,18 +201,14 @@
       box-shadow:0 0 0 2px rgba(56,189,248,.35);
       background:#020617;
     }
-    .textarea{ min-height:90px; resize:vertical; }
+    .textarea{ min-height:100px; resize:vertical; }
 
     .grid-main{
       display:grid; gap:.9rem; grid-template-columns:2.1fr 1.35fr;
-      flex:1;
-      min-height:0;
+      flex:1; min-height:0;
     }
     @media(max-width:1100px){
-      .grid-main{
-        grid-template-columns:1fr;
-        height:auto;
-      }
+      .grid-main{ grid-template-columns:1fr; height:auto; }
     }
 
     .form-scroll-wrap{
@@ -235,10 +228,7 @@
     .grid-3{ display:grid; gap:.7rem; grid-template-columns:repeat(3,minmax(0,1fr)); }
     @media(max-width:1100px){
       .form-scroll-wrap{ max-height:none; }
-      .preview-wrap{
-        position:static;
-        margin-top:1rem;
-      }
+      .preview-wrap{ position:static; margin-top:1rem; }
     }
     @media(max-width:900px){
       .grid-2,.grid-3{ grid-template-columns:1fr; }
@@ -292,7 +282,7 @@
       overflow:hidden;
       border:1px solid rgba(31,41,55,.9);
       background:#020617;
-      height:140px;
+      height:160px;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -310,6 +300,14 @@
       font-size:.86rem;
       color:#cbd5f5;
     }
+
+    .preview-list{
+      margin-top:.35rem;
+      padding-left:1rem;
+      font-size:.86rem;
+      color:#cbd5f5;
+    }
+    .preview-list li{ margin:.18rem 0; }
 
     .toast{
       position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
@@ -511,6 +509,7 @@
                     <div>
                       <label class="muted" style="font-size:.85rem;">Gallery image URLs (optional)</label>
                       <input id="jobGallery" class="input" placeholder="External URLs or CDN images, comma separated">
+                      <p class="file-subtext">Example: https://cdn/.../1.jpg, https://cdn/.../2.jpg</p>
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Company (optional)</label>
@@ -529,7 +528,7 @@
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Salary amount</label>
-                      <input id="jobSalaryAmount" type="number" class="input" placeholder="2000">
+                      <input id="jobSalaryAmount" type="number" class="input" placeholder="2000" min="0">
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Pay frequency</label>
@@ -552,7 +551,8 @@
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Languages</label>
-                      <input id="jobLanguages" class="input" placeholder="English (required), French (bonus)">
+                      <textarea id="jobLanguages" class="textarea" placeholder="- English (required)&#10;- French (bonus)"></textarea>
+                      <p class="file-subtext">Each line becomes a bullet. Stored with “.,”.</p>
                     </div>
                   </div>
                 </section>
@@ -591,16 +591,19 @@
                   <div class="grid-2">
                     <div>
                       <label class="muted" style="font-size:.85rem;">Responsibilities</label>
-                      <textarea id="jobResponsibilities" class="textarea" placeholder="- Load/unload goods&#10;- Follow safety rules&#10;- Work in shifts"></textarea>
+                      <textarea id="jobResponsibilities" class="textarea" placeholder="- Load/unload goods&#10;- Follow safety rules&#10>- Work in shifts"></textarea>
+                      <p class="file-subtext">Each line becomes a bullet. Stored with “.,”.</p>
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Requirements (detailed)</label>
-                      <textarea id="jobReqDetails" class="textarea" placeholder="- Able to lift 20kg&#10;- Valid passport&#10;- Previous warehouse experience"></textarea>
+                      <textarea id="jobReqDetails" class="textarea" placeholder="- Able to lift 20kg&#10;- Valid passport&#10>- Previous warehouse experience"></textarea>
+                      <p class="file-subtext">Each line becomes a bullet. Stored with “.,”.</p>
                     </div>
                   </div>
                   <div style="margin-top:.6rem;">
                     <label class="muted" style="font-size:.85rem;">Benefits</label>
-                    <textarea id="jobBenefits" class="textarea" placeholder="- Accommodation support&#10;- Transport to site&#10;- Paid overtime"></textarea>
+                    <textarea id="jobBenefits" class="textarea" placeholder="- Accommodation support&#10>- Transport to site&#10>- Paid overtime"></textarea>
+                    <p class="file-subtext">Each line becomes a bullet. Stored with “.,”.</p>
                   </div>
                 </section>
 
@@ -618,7 +621,7 @@
                     </div>
                     <div>
                       <label class="muted" style="font-size:.85rem;">Priority</label>
-                      <input id="jobPriority" type="number" class="input" value="0">
+                      <input id="jobPriority" type="number" class="input" value="0" min="0">
                     </div>
                   </div>
                   <div class="grid-3" style="margin-top:.6rem;">
@@ -683,6 +686,26 @@
                 <div class="preview-body" id="prevShort">
                   Short description will appear here as applicants see it on the listing page.
                 </div>
+
+                <div class="preview-body">
+                  <h4 class="section-title" style="font-size:.95rem;margin:.6rem 0 .3rem;">Responsibilities</h4>
+                  <ul class="preview-list" id="prevResponsibilities"></ul>
+                </div>
+
+                <div class="preview-body">
+                  <h4 class="section-title" style="font-size:.95rem;margin:.6rem 0 .3rem;">Detailed requirements</h4>
+                  <ul class="preview-list" id="prevReqDetails"></ul>
+                </div>
+
+                <div class="preview-body">
+                  <h4 class="section-title" style="font-size:.95rem;margin:.6rem 0 .3rem;">Benefits</h4>
+                  <ul class="preview-list" id="prevBenefits"></ul>
+                </div>
+
+                <div class="preview-body">
+                  <h4 class="section-title" style="font-size:.95rem;margin:.6rem 0 .3rem;">Languages</h4>
+                  <ul class="preview-list" id="prevLanguages"></ul>
+                </div>
               </section>
             </div>
           </div>
@@ -724,15 +747,21 @@
     const adminEmailSpan=document.getElementById('adminEmail');
     const adminLogout=document.getElementById('adminLogout');
 
-    const { data } = await sb.auth.getSession();
-    const session=data.session;
-    const admin=session?.user;
+    try{
+      const { data } = await sb.auth.getSession();
+      const session=data.session;
+      const admin=session?.user;
 
-    if(!admin){
-      showToast('Admin session required.');
+      if(!admin){
+        showToast('Admin session required.');
+        window.location.href='/views/pages/login.html';
+      }else{
+        adminEmailSpan.textContent=admin.email;
+      }
+    }catch(e){
+      console.error('Session error:', e);
+      showToast('Session check failed.');
       window.location.href='/views/pages/login.html';
-    }else{
-      adminEmailSpan.textContent=admin.email;
     }
 
     adminLogout?.addEventListener('click',async()=>{
@@ -793,6 +822,11 @@
     const prevTagSalary=document.getElementById('prevTagSalary');
     const prevShort=document.getElementById('prevShort');
 
+    const prevResponsibilities=document.getElementById('prevResponsibilities');
+    const prevReqDetails=document.getElementById('prevReqDetails');
+    const prevBenefits=document.getElementById('prevBenefits');
+    const prevLanguages=document.getElementById('prevLanguages');
+
     const crumbMode=document.getElementById('crumbMode');
     const pageTitle=document.getElementById('pageTitle');
     const modeBadge=document.getElementById('modeBadge');
@@ -842,6 +876,55 @@
       }
     }
 
+    /* List parsing helpers — UI <-> DB (“.,” separator) */
+    const SEP='.,';
+
+    function linesToArray(textareaValue){
+      return (textareaValue || '')
+        .split(/\r?\n/)
+        .map(s=>s.trim())
+        .filter(Boolean);
+    }
+
+    function arrayToDbString(arr){
+      return (arr || []).map(s => s.replace(/\s+/g,' ').trim()).join(SEP);
+    }
+
+    function dbStringToLines(dbString){
+      if(!dbString) return '';
+      const arr = String(dbString)
+        .split(SEP)
+        .map(s=>s.trim())
+        .filter(Boolean);
+      return arr.join('\n');
+    }
+
+    function setPreviewList(ul, arr){
+      ul.innerHTML = '';
+      (arr || []).forEach(item=>{
+        const li=document.createElement('li');
+        li.textContent=item;
+        ul.appendChild(li);
+      });
+    }
+
+    function computeSalaryLabel(){
+      const salaryText=jobSalary.value.trim();
+      const salaryAmountRaw=jobSalaryAmount.value.trim();
+      const hasAmount = salaryAmountRaw !== '' && !Number.isNaN(Number(salaryAmountRaw));
+      const currency=jobCurrency.value.trim();
+      const freq=jobPayFrequency.value || '';
+
+      if(salaryText) return salaryText;
+
+      if(hasAmount){
+        const amountPart = currency ? `${salaryAmountRaw} ${currency}` : salaryAmountRaw;
+        return freq ? `${amountPart} / ${freq}` : amountPart;
+      }
+
+      return 'Salary';
+    }
+
     function updatePreview(){
       const title=jobTitle.value.trim() || 'Job title';
       const location=(jobCity.value.trim() && jobCountry.value.trim())
@@ -851,9 +934,6 @@
       const plan=jobPlan.value || '';
       const type=jobType.value || '';
       const category=jobCategory.value.trim();
-      const salaryText=jobSalary.value.trim();
-      const salaryAmount=jobSalaryAmount.value.trim();
-      const currency=jobCurrency.value.trim() || '';
 
       prevTitle.textContent=title;
       prevLocation.textContent=location;
@@ -870,16 +950,17 @@
       prevTagType.textContent = type || 'Type';
       prevTagCategory.textContent = category || 'Category';
 
-      let salaryLabel='Salary';
-      if(salaryText){
-        salaryLabel=salaryText;
-      }else if(salaryAmount){
-        salaryLabel = currency ? `${salaryAmount} ${currency}` : salaryAmount;
-      }
+      const salaryLabel=computeSalaryLabel();
       prevTagSalary.textContent = salaryLabel;
 
       prevShort.textContent = jobShortDesc.value.trim()
         || 'Short description will appear here as applicants see it on the listing page.';
+
+      /* Lists preview (from current textareas) */
+      setPreviewList(prevResponsibilities, linesToArray(jobResponsibilities.value));
+      setPreviewList(prevReqDetails, linesToArray(jobReqDetails.value));
+      setPreviewList(prevBenefits, linesToArray(jobBenefits.value));
+      setPreviewList(prevLanguages, linesToArray(jobLanguages.value));
 
       if(currentLogoUrl){
         prevLogoText.innerHTML=`<img src="${currentLogoUrl}" alt="logo">`;
@@ -977,22 +1058,40 @@
         jobType.value=m.job_type || '';
         currentCoverUrl=m.cover_image || null;
         currentLogoUrl=m.logo || null;
+
+        /* Gallery array round-trip */
         jobGallery.value=(m.gallery_images || []).join(', ');
+
+        /* Salary round-trip */
         jobSalary.value=m.salary || '';
         jobSalaryAmount.value=m.salary_amount != null ? String(m.salary_amount) : '';
         jobPayFrequency.value=m.pay_frequency || '';
         jobContractLength.value=m.contract_length || '';
         jobCompany.value=m.company || '';
         jobCurrency.value=m.currency || '';
+
         jobExperienceLevel.value=m.experience_level || '';
         jobMinExperience.value=m.min_experience || '';
         jobEducation.value=m.education || '';
-        jobLanguages.value=m.languages || '';
-        jobResponsibilities.value=m.responsibilities || '';
-        jobReqDetails.value=m.requirements_detailed || '';
-        jobBenefits.value=m.benefits || '';
+
+        /* Lists round-trip — DB “.,” -> UI lines */
+        jobLanguages.value = dbStringToLines(m.languages || '');
+        jobResponsibilities.value = dbStringToLines(m.responsibilities || '');
+        jobReqDetails.value = dbStringToLines(m.requirements_detailed || '');
+        jobBenefits.value = dbStringToLines(m.benefits || '');
+
         jobCategory.value=m.category || '';
-        jobTags.value=(m.tags || []).join(', ');
+
+        /* Tags round-trip (array or string) */
+        if(Array.isArray(m.tags)){
+          jobTags.value = m.tags.join(', ');
+        }else if(typeof m.tags === 'string'){
+          const tagArr = m.tags.split(SEP).map(t=>t.trim()).filter(Boolean);
+          jobTags.value = tagArr.join(', ');
+        }else{
+          jobTags.value='';
+        }
+
         jobPriority.value=String(m.priority ?? 0);
         jobFeatured.value=m.featured ? 'true' : 'false';
         jobAdminNote.value=m.admin_note || '';
@@ -1059,32 +1158,47 @@
     }
 
     function buildMetadataPayloadBase(){
+      /* Gallery (comma -> array) */
       const galleryRaw=jobGallery.value.trim();
       const gallery_images=galleryRaw ? galleryRaw.split(',').map(u=>u.trim()).filter(Boolean) : [];
+
       const job_type=jobType.value || null;
+
+      /* Salary parts */
       const salary=jobSalary.value.trim() || null;
       const salary_amount_raw=jobSalaryAmount.value.trim();
-      const salary_amount=salary_amount_raw ? Number(salary_amount_raw) : null;
+      const salary_amount=(salary_amount_raw !== '' && !Number.isNaN(Number(salary_amount_raw)))
+        ? Number(salary_amount_raw)
+        : null;
       const pay_frequency=jobPayFrequency.value || null;
       const contract_length=jobContractLength.value.trim() || null;
       const company=jobCompany.value.trim() || null;
       const currency=jobCurrency.value.trim() || null;
+
       const experience_level=jobExperienceLevel.value || null;
       const min_experience=jobMinExperience.value.trim() || null;
       const education=jobEducation.value.trim() || null;
-      const languages=jobLanguages.value.trim() || null;
+
+      /* Lists UI -> DB string (“.,” separator) */
+      const languages = arrayToDbString(linesToArray(jobLanguages.value)) || null;
+      const responsibilities = arrayToDbString(linesToArray(jobResponsibilities.value)) || null;
+      const requirements_detailed = arrayToDbString(linesToArray(jobReqDetails.value)) || null;
+      const benefits = arrayToDbString(linesToArray(jobBenefits.value)) || null;
+
       const short_desc=jobShortDesc.value.trim() || null;
-      const responsibilities=jobResponsibilities.value.trim() || null;
-      const requirements_detailed=jobReqDetails.value.trim() || null;
-      const benefits=jobBenefits.value.trim() || null;
+
       const category=jobCategory.value.trim() || null;
+
+      /* Tags (comma -> array) */
       const tagsRaw=jobTags.value.trim();
       const tags=tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
+
+      /* Priority / featured / admin note */
       const priorityRaw=jobPriority.value.trim();
       let priority=0;
       if(priorityRaw){
         const p=parseInt(priorityRaw,10);
-        if(!Number.isNaN(p)) priority=p;
+        if(!Number.isNaN(p) && p >= 0) priority=p;
       }
       const featured=jobFeatured.value==='true';
       const admin_note=jobAdminNote.value.trim() || null;
@@ -1123,6 +1237,12 @@
 
       let metadata=buildMetadataPayloadBase();
       metadata=await prepareImagesInMetadata(metadata);
+
+      /* Normalize salary text if empty and we have amount/currency/frequency */
+      if(!metadata.salary && metadata.salary_amount != null){
+        const amountPart = metadata.currency ? `${metadata.salary_amount} ${metadata.currency}` : `${metadata.salary_amount}`;
+        metadata.salary = metadata.pay_frequency ? `${amountPart} / ${metadata.pay_frequency}` : amountPart;
+      }
 
       const baseSlug=slugify(title);
       const slug=await generateUniqueSlug(baseSlug);
@@ -1177,3 +1297,5 @@
   </script>
 </body>
 </html>
+
+
