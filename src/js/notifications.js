@@ -125,7 +125,7 @@ function renderNotificationItem(n){
   el.style.display="grid";
   el.style.gap="6px";
   el.style.transition="background .15s ease";
-  if(unread) el.style.background="#e0f2fe"; // light blue on unread
+  if(unread) el.style.background="var(--brand)"; // light blue on unread
 
   const title=n.title||meta.title||"Notification";
   const actorEmail=meta.user_email || n.user_email || meta.email || "";
@@ -136,7 +136,7 @@ function renderNotificationItem(n){
   titleEl.textContent=headerText;
 
   const bodyEl=document.createElement("div");
-  bodyEl.className="body"; bodyEl.style.color="#64748b"; bodyEl.style.fontSize=".88rem";
+  bodyEl.className="body"; bodyEl.style.color="var(--gray-200)"; bodyEl.style.fontSize=".88rem";
   bodyEl.textContent=n.message || n.text || meta.message || "";
 
   const metaRow=document.createElement("div");
