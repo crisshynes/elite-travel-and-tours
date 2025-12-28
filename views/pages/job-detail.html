@@ -928,10 +928,21 @@
       try{ return new Date(d).toLocaleDateString(); }catch{ return '—'; }
     }
 
+    // function mapArrayFromStringOrArray(val){
+    //   if(Array.isArray(val)) return val;
+    //   if(typeof val==='string' && val.trim()){
+    //     return val.split('\n').map(x=>x.trim()).filter(Boolean);
+    //   }
+    //   return [];
+    // }
     function mapArrayFromStringOrArray(val){
-      if(Array.isArray(val)) return val;
-      if(typeof val==='string' && val.trim()){
-        return val.split('\n').map(x=>x.trim()).filter(Boolean);
+      if (Array.isArray(val)) return val;
+      if (typeof val === 'string' && val.trim()) {
+        return val
+          // split on ".,", or newline
+          .split(/(?:\.,|\n)/)
+          .map(x => x.trim())
+          .filter(Boolean);
       }
       return [];
     }
