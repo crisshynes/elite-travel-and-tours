@@ -1289,7 +1289,7 @@
 
         if(channel !== 'momo_auto' && paymentContext.trackingId){
           setTimeout(()=>{
-            window.location.href = `/views/pages/tracking.html?tracking=${encodeURIComponent(paymentContext.trackingId)}`;
+            // window.location.href = `/views/pages/tracking.html?tracking=${encodeURIComponent(paymentContext.trackingId)}`;
           }, 10000);
         }
       }catch(err){
@@ -1338,7 +1338,7 @@
         closeMomoPinModal();
         if(paymentContext.trackingId){
           setTimeout(()=>{
-           window.location.href = `/views/pages/tracking.html?tracking=${encodeURIComponent(paymentContext.trackingId)}`;
+           // window.location.href = `/views/pages/tracking.html?tracking=${encodeURIComponent(paymentContext.trackingId)}`;
           }, 10000);
         }
       }catch(err){
