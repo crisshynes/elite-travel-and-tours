@@ -842,67 +842,163 @@
     }
 
     async function loadApplicationPayment(){
-      if(!paymentContext.applicationId && !paymentContext.trackingId) return;
-      try{
-        let query = sb
-          .from('applications')
-          .select('id,tracking_id,status,plan,application_type,details,created_at,service_slug,service_id,metadata')
-          .limit(1);
-        if(paymentContext.applicationId){
-          query = query.eq('id', paymentContext.applicationId);
-        }else{
-          query = query.eq('tracking_id', paymentContext.trackingId);
-        }
-        const { data, error } = await query.maybeSingle();
-        if(error) throw error;
-        if(!data) return;
+  if(!paymentContext.applicationId && !paymentContext.trackingId) return;
+  try{
+    let query = sb
+      .from('applications')
+      .select('id,tracking_id,status,plan,application_type,details,created_at,service_slug,service_id,metadata')
+      .limit(1);
 
-        const d = data.details || {};
-        const payment = d.payment || null;
-        const priceAmount = d.price_amount || d.service_price || null;
-        const priceLabel = d.price_label || 'Program fee';
+    if(paymentContext.applicationId){
+      query = query.eq('id', paymentContext.applicationId);
+    }else{
+      query = query.eq('tracking_id', paymentContext.trackingId);
+    }
 
-        const m = d || {};
-        const best = resolveBestImage({
-          icon: m.icon,
-          banner: m.banner,
-          cover_image: m.cover_image,
-          logo: m.logo,
-          image_url: m.image_url
+    const { data, error } = await query.maybeSingle();
+    if(error) throw error;
+    if(!data) return;
+
+    const d = data.details || {};
+    const payment = d.payment || null;
+    const priceAmount = d.price_amount || d.service_price || null;
+    const priceLabel = d.price_label || 'Program fee';
+
+    // --- unify image resolution with loadService ---
+    const m = d.metadata || d || {};
+    const best = resolveBestImage({
+      icon: m.icon,
+      banner: m.banner || data.metadata?.banner,
+      cover_image: m.cover_image,
+      logo: m.logo,
+      image_url: m.image_url
+    });
+
+    paymentContext.title = paymentContext.title || d.title || 'Application payment';
+    paymentContext.description = paymentContext.description || d.description || 'Complete payment for this application.';
+    paymentContext.cover = paymentContext.cover || best || DEFAULT_SERVICE_IMG;
+
+    if(payment){
+      paymentContext.amount = payment.amount ?? paymentContext.amount ?? priceAmount ?? null;
+      paymentContext.currency = payment.currency || paymentContext.currency || 'GHS';
+      paymentContext.metadata.payment_status = payment.status || 'pending';
+      paymentContext.metadata.payment_label = payment.label || priceLabel;
+      paymentContext.metadata.payment_source = payment.source || 'service';
+    }else{
+      if(paymentContext.amount == null && priceAmount != null){
+        paymentContext.amount = priceAmount;
+      }
+      paymentContext.metadata.payment_label = paymentContext.metadata.payment_label || priceLabel;
+      paymentContext.metadata.payment_status = 'pending';
+    }
+
+    // --- enrich metadata with service info like loadService ---
+    paymentContext.metadata.program_type = paymentContext.metadata.program_type || d.program_type || data.application_type || null;
+    paymentContext.metadata.plan = paymentContext.metadata.plan || d.plan || data.plan || null;
+    paymentContext.metadata.application_id = data.id;
+    paymentContext.metadata.tracking_id = data.tracking_id;
+    paymentContext.metadata.service_id = data.service_id || paymentContext.metadata.service_id || null;
+    paymentContext.metadata.service_slug = data.service_slug || paymentContext.metadata.service_slug || null;
+    paymentContext.metadata.raw_application_metadata = data.metadata || {};
+
+    // If service metadata exists, merge it in
+    if(data.service_id){
+      const { data: svc } = await sb
+        .from('services')
+        .select('id,title,category,tags,price,short_desc,banner,metadata')
+        .eq('id', data.service_id)
+        .maybeSingle();
+      if(svc){
+        const sm = svc.metadata || {};
+        const svcBest = resolveBestImage({
+          icon: sm.icon,
+          banner: sm.banner || svc.banner,
+          cover_image: sm.cover_image,
+          logo: sm.logo,
+          image_url: sm.image_url
         });
-
-        paymentContext.title = paymentContext.title || d.title || 'Application payment';
-        paymentContext.description = paymentContext.description || d.description || 'Complete payment for this application.';
-        paymentContext.cover = paymentContext.cover || best || DEFAULT_SERVICE_IMG;
-
-        if(payment){
-          paymentContext.amount = payment.amount ?? paymentContext.amount ?? priceAmount ?? null;
-          paymentContext.currency = payment.currency || paymentContext.currency || 'GHS';
-          paymentContext.metadata.payment_status = payment.status || 'pending';
-          paymentContext.metadata.payment_label = payment.label || priceLabel;
-          paymentContext.metadata.payment_source = payment.source || 'service';
-        }else{
-          if(paymentContext.amount == null && priceAmount != null){
-            paymentContext.amount = priceAmount;
-          }
-          paymentContext.metadata.payment_label = paymentContext.metadata.payment_label || priceLabel;
-          paymentContext.metadata.payment_status = 'pending';
-        }
-
-        paymentContext.metadata.program_type = paymentContext.metadata.program_type || d.program_type || data.application_type || null;
-        paymentContext.metadata.plan = paymentContext.metadata.plan || d.plan || data.plan || null;
-        paymentContext.metadata.application_id = data.id;
-        paymentContext.metadata.tracking_id = data.tracking_id;
-        paymentContext.metadata.service_id = data.service_id || paymentContext.metadata.service_id || null;
-        paymentContext.metadata.service_slug = data.service_slug || paymentContext.metadata.service_slug || null;
-        paymentContext.metadata.raw_application_metadata = data.metadata || {};
-
-        summarySubtitle.textContent = 'Payment initiated from your application. Amount may be locked by admin.';
-        summaryTypeBadge.innerHTML = `<i class="fa fa-file-signature"></i> Application payment`;
-      }catch(e){
-        console.warn('Failed to load application payment context', e);
+        // override cover if service has a better image
+        paymentContext.cover = paymentContext.cover || svcBest || DEFAULT_SERVICE_IMG;
+        paymentContext.metadata = {
+          ...paymentContext.metadata,
+          service_id: svc.id,
+          service_title: svc.title,
+          service_category: svc.category || null,
+          service_tags: Array.isArray(svc.tags) ? svc.tags : (svc.tags ? [svc.tags] : []),
+          raw_service_metadata: sm
+        };
       }
     }
+
+    summarySubtitle.textContent = 'Payment initiated from your application. Amount may be locked by admin.';
+    summaryTypeBadge.innerHTML = `<i class="fa fa-file-signature"></i> Application payment`;
+  }catch(e){
+    console.warn('Failed to load application payment context', e);
+  }
+}
+
+    // async function loadApplicationPayment(){
+    //   if(!paymentContext.applicationId && !paymentContext.trackingId) return;
+    //   try{
+    //     let query = sb
+    //       .from('applications')
+    //       .select('id,tracking_id,status,plan,application_type,details,created_at,service_slug,service_id,metadata')
+    //       .limit(1);
+    //     if(paymentContext.applicationId){
+    //       query = query.eq('id', paymentContext.applicationId);
+    //     }else{
+    //       query = query.eq('tracking_id', paymentContext.trackingId);
+    //     }
+    //     const { data, error } = await query.maybeSingle();
+    //     if(error) throw error;
+    //     if(!data) return;
+
+    //     const d = data.details || {};
+    //     const payment = d.payment || null;
+    //     const priceAmount = d.price_amount || d.service_price || null;
+    //     const priceLabel = d.price_label || 'Program fee';
+
+    //     const m = d || {};
+    //     const best = resolveBestImage({
+    //       icon: m.icon,
+    //       banner: m.banner,
+    //       cover_image: m.cover_image,
+    //       logo: m.logo,
+    //       image_url: m.image_url
+    //     });
+
+    //     paymentContext.title = paymentContext.title || d.title || 'Application payment';
+    //     paymentContext.description = paymentContext.description || d.description || 'Complete payment for this application.';
+    //     paymentContext.cover = paymentContext.cover || best || DEFAULT_SERVICE_IMG;
+
+    //     if(payment){
+    //       paymentContext.amount = payment.amount ?? paymentContext.amount ?? priceAmount ?? null;
+    //       paymentContext.currency = payment.currency || paymentContext.currency || 'GHS';
+    //       paymentContext.metadata.payment_status = payment.status || 'pending';
+    //       paymentContext.metadata.payment_label = payment.label || priceLabel;
+    //       paymentContext.metadata.payment_source = payment.source || 'service';
+    //     }else{
+    //       if(paymentContext.amount == null && priceAmount != null){
+    //         paymentContext.amount = priceAmount;
+    //       }
+    //       paymentContext.metadata.payment_label = paymentContext.metadata.payment_label || priceLabel;
+    //       paymentContext.metadata.payment_status = 'pending';
+    //     }
+
+    //     paymentContext.metadata.program_type = paymentContext.metadata.program_type || d.program_type || data.application_type || null;
+    //     paymentContext.metadata.plan = paymentContext.metadata.plan || d.plan || data.plan || null;
+    //     paymentContext.metadata.application_id = data.id;
+    //     paymentContext.metadata.tracking_id = data.tracking_id;
+    //     paymentContext.metadata.service_id = data.service_id || paymentContext.metadata.service_id || null;
+    //     paymentContext.metadata.service_slug = data.service_slug || paymentContext.metadata.service_slug || null;
+    //     paymentContext.metadata.raw_application_metadata = data.metadata || {};
+
+    //     summarySubtitle.textContent = 'Payment initiated from your application. Amount may be locked by admin.';
+    //     summaryTypeBadge.innerHTML = `<i class="fa fa-file-signature"></i> Application payment`;
+    //   }catch(e){
+    //     console.warn('Failed to load application payment context', e);
+    //   }
+    // }
 
     async function loadContext(){
       try{
